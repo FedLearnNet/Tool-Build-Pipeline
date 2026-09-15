@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Prepare keyrings and apt sources for Docker CLI and Trivy (no heavy installs here)
@@ -18,7 +18,7 @@ RUN apt-get update && \
     bash -c 'echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" > /etc/apt/sources.list.d/trivy.list' && \
     rm -rf /var/lib/apt/lists/*
 
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ARG TARGETARCH
 ARG COSIGN_VERSION=v3.0.2
