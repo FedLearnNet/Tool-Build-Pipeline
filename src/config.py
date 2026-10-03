@@ -11,6 +11,7 @@ class AppConfig(BaseSettings):
     pipeline_secret: str = Field(default="")
     oauth_token: str = Field(default="")
 
+    local_only: bool = Field(default=False)
     use_buildx: bool = Field(default=True)
     buildx_platforms: List[str] = Field(
         default_factory=lambda: ["linux/arm64/v8", "linux/amd64"]
@@ -42,6 +43,8 @@ class AppConfig(BaseSettings):
         if not self.remote_info:
             raise ValueError("Remote info is not set in the configuration.")
         image_name = self.remote_info.image_name.lower()
+        if self.local_only:
+            return f"{image_name}:{self.remote_info.docker_tag}"
         return f"{self.docker_registry}{self.docker_group}/{image_name}:{self.remote_info.docker_tag}"
 
 

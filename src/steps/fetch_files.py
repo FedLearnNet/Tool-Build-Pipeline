@@ -2,6 +2,7 @@ import io
 import logging
 import base64
 import os
+import shutil
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -34,8 +35,12 @@ class FetchFilesStep(BaseStep):
             return
 
         repo_path = Path(self.config.repo_path).expanduser().resolve()
-        model_dir_rel = self._read_env_value(repo_path / ".env", "MODEL_DIR") or "./model"
-        target_dir = self._safe_join(repo_path, model_dir_rel)
+        if self.config.local_only:
+            shutil.rmtree(repo_path, ignore_errors=True)
+            target_dir = repo_path
+        else:
+            model_dir_rel = self._read_env_value(repo_path / ".env", "MODEL_DIR") or "./model"
+            target_dir = self._safe_join(repo_path, model_dir_rel)
         target_dir.mkdir(parents=True, exist_ok=True)
         unpack_msg = f"Unpacking pipeline ZIP into: {target_dir}"
         logger.info(unpack_msg)

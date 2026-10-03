@@ -48,7 +48,11 @@ class CollectSummaryStep(BaseStep):
         if not self.config.remote_info:
             raise Exception("remote_info missing; FetchConfigStep must run first.")
 
-        self.result.commit_hash = self._get_commit_hash()
+        if self.config.local_only:
+            # local builds have no git repository, the docker tag is the code hash
+            self.result.commit_hash = self.config.remote_info.docker_tag
+        else:
+            self.result.commit_hash = self._get_commit_hash()
 
         base_dir = os.path.abspath(self.config.repo_path)
 

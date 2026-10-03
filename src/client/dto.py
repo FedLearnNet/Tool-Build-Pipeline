@@ -22,7 +22,7 @@ class StatusUpdateDTO(BaseModel):
 
 class PipelineRunInfoDTO(BaseModel):
     """ DTO for receiving build info from the server. """
-    git_repo_url: str = Field(alias='gitRepoUrl')
+    git_repo_url: Optional[str] = Field(alias='gitRepoUrl', default=None)
     image_name: str = Field(alias='imageName')
     docker_tag: str = Field(alias='dockerTag')
 

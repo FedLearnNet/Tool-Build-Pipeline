@@ -21,17 +21,29 @@ class Pipeline:
         self.config: AppConfig = config
         self.client: ApiClient = client
         self.result = AppPublishInfoDTO()
-        self.steps = [
-            FetchConfigStep(config, client, self.result),
-            CloneRepoStep(config, client, self.result),
-            FetchFilesStep(config, client, self.result),
-            BuildImageStep(config, client, self.result),
-            ScanImageStep(config, client, self.result),
-            MalwareCheckStep(config, client, self.result),
-            RunPytestStep(config, client, self.result),
-            PushImageStep(config, client, self.result),
-            CollectSummaryStep(config, client, self.result),
-        ]
+        if config.local_only:
+            #this is for local builded image via ETL pipeline, or so, no pushing or internet
+            self.steps = [
+                FetchConfigStep(config, client, self.result),
+                FetchFilesStep(config, client, self.result),
+                BuildImageStep(config, client, self.result),
+                ScanImageStep(config, client, self.result),
+                MalwareCheckStep(config, client, self.result),
+                RunPytestStep(config, client, self.result),
+                CollectSummaryStep(config, client, self.result),
+            ]
+        else:
+            self.steps = [
+                FetchConfigStep(config, client, self.result),
+                CloneRepoStep(config, client, self.result),
+                FetchFilesStep(config, client, self.result),
+                BuildImageStep(config, client, self.result),
+                ScanImageStep(config, client, self.result),
+                MalwareCheckStep(config, client, self.result),
+                RunPytestStep(config, client, self.result),
+                PushImageStep(config, client, self.result),
+                CollectSummaryStep(config, client, self.result),
+            ]
 
     def run(self):
         logger.info(f"--- Starting Pipeline Run: {self.config.pipeline_id} ---")

@@ -60,13 +60,25 @@ class ScanImageStep(BaseStep):
 
         logger.info(f"Scanning image: {image_name} for HIGH and CRITICAL vulnerabilities.")
 
-        command = [
-            "trivy", "image",
-            "--format", "json",
-            "--severity", "HIGH,CRITICAL",
-            "--exit-code", "1",
-            image_name
-        ]
+        if self.config.local_only:
+            # local builds use the database baked into the pipeline image
+            command = [
+                "trivy", "image",
+                "--format", "json",
+                "--severity", "HIGH,CRITICAL",
+                "--exit-code", "1",
+                "--skip-db-update",
+                "--offline-scan",
+                image_name
+            ]
+        else:
+            command = [
+                "trivy", "image",
+                "--format", "json",
+                "--severity", "HIGH,CRITICAL",
+                "--exit-code", "1",
+                image_name
+            ]
 
         self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
 

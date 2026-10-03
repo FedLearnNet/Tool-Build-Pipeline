@@ -25,6 +25,15 @@ docker compose up --build
 
 All settings come from environment variables (or a `.env` file), loaded in [`src/config.py`](src/config.py).
 
+`LOCAL_ONLY=true` builds an image that never leaves the docker host, as the local learning API does for
+custom transformers: the sources come as zip instead of a clone, nothing is pushed, the trivy and ClamAV
+databases baked into this image are used offline and the test container runs without network. Local
+builds use the image as `fl-net/tool-build-pipeline:dev`:
+
+```bash
+docker build -t fl-net/tool-build-pipeline:dev .
+```
+
 
 ## Testing
 
