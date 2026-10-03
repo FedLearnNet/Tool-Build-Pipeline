@@ -70,8 +70,11 @@ class ScanImageStep(BaseStep):
                 "--output", report_path,
                 "--severity", "HIGH,CRITICAL",
                 "--exit-code", "1",
-                image_name
             ]
+            if self.config.local_only:
+                # Local builds use the database baked into the pipeline image.
+                command.extend(["--skip-db-update", "--offline-scan"])
+            command.append(image_name)
 
             self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
 

@@ -30,6 +30,9 @@ class CollectSummaryStep(BaseStep):
         else:
             return abs_path
 
+        if self.config.local_only:
+            return rel
+
         rel_q = quote(rel)
         return f"{base}/blob/{commit}/{rel_q}"
 
@@ -37,7 +40,9 @@ class CollectSummaryStep(BaseStep):
         if not self.config.remote_info:
             raise Exception("remote_info missing; FetchConfigStep must run first.")
 
-        if not self.result.commit_hash:
+        if self.config.local_only:
+            self.result.commit_hash = "local"
+        elif not self.result.commit_hash:
             raise Exception("commit_hash missing; CloneRepoStep must run first.")
 
         base_dir = os.path.abspath(self.config.repo_path)

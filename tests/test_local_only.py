@@ -7,6 +7,7 @@ from src.client.result_dto import AppPublishInfoDTO
 from src.config import AppConfig
 from src.pipeline import Pipeline
 from src.steps.fetch_files import FetchFilesStep
+from src.steps.collect_summary import CollectSummaryStep
 
 
 def _config(tmp_path, **kwargs) -> AppConfig:
@@ -33,3 +34,19 @@ def test_local_files_are_the_build_context(tmp_path) -> None:
     client = MagicMock(get_zip_for_pipeline=MagicMock(return_value=buffer.getvalue()))
     FetchFilesStep(_config(tmp_path), client, AppPublishInfoDTO()).execute()
     assert [p.name for p in (tmp_path / "repo").iterdir()] == ["Dockerfile"]
+
+
+def test_local_summary_uses_local_commit_and_relative_file_paths(tmp_path) -> None:
+    config = _config(tmp_path)
+    data = tmp_path / "repo" / "data"
+    data.mkdir(parents=True)
+    (data / "input.csv").write_text("value\n1\n")
+    client = MagicMock()
+    result = AppPublishInfoDTO()
+
+    CollectSummaryStep(config, client, result).execute()
+
+    assert result.commit_hash == "local"
+    assert result.image_name == "fl-net/code/double-1:abc123"
+    assert result.file_paths == ["data/input.csv"]
+    client.upload_summary.assert_called_once_with(result)

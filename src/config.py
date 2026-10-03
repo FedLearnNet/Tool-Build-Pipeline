@@ -53,6 +53,8 @@ class AppConfig(BaseSettings):
         registry = self.docker_registry.removeprefix("https://").removeprefix("http://").rstrip("/")
         group = self.docker_group.strip("/")
         repository = "/".join(part for part in [registry, group, image_name] if part)
+        if self.local_only:
+            return f"{image_name}:{self.remote_info.docker_tag or self.docker_tag}"
         return f"{repository}:{self.docker_tag}"
 
 
