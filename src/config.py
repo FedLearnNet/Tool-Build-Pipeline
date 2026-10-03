@@ -12,6 +12,7 @@ class AppConfig(BaseSettings):
     oauth_token: str = Field(default="")
     pipeline_api_key: str = Field(default="")
 
+    local_only: bool = Field(default=False)
     use_buildx: bool = Field(default=True)
     buildx_platforms: List[str] = Field(
         default_factory=lambda: ["linux/arm64/v8", "linux/amd64"]

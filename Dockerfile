@@ -56,7 +56,8 @@ RUN case "${TARGETARCH}" in \
 # Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN freshclam
+# definitions are baked in, so local builds also scan without internet access
+RUN freshclam && trivy image --download-db-only
 # App code
 COPY main.py .
 COPY src/ ./src/
