@@ -1,11 +1,14 @@
-#!/usr/bin/env bash
-# Small helper script to build the pipeline image locally to use in testing.
+#!/bin/sh
+# Small helper script to build the pipeline image locally to use in the testing bundle.
 # orch-api only starts the pipeline image under its ghcr name (any tag), so the local image has to
 # carry that name. With a tag that does not exist on ghcr the pull fails and orch-api uses this one.
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+set -eu
+cd "$(dirname "$0")/.."
 
-TAG=testingtag
+# The testing bundle always pulls new images on startup but ignores this tag, 
+# so keep the tag if you wanna use it in the testing bundle
+TAG="${1:-testingtag}"
 
-docker build -t "ghcr.io/fedlearnnet/tool-build-pipeline/pipeline:$TAG" "$REPO_ROOT"
+
+docker build -t "ghcr.io/fedlearnnet/tool-build-pipeline/pipeline:$TAG" .
+
