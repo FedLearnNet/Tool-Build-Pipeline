@@ -17,15 +17,10 @@ class CloneRepoStep(BaseStep):
         logger.info(f"Cloning repository from {git_repo_url} into {self.config.repo_path}")
         token = self.config.repo_token
         username = self.config.docker_username
-        if git_repo_url.startswith("https://gitlab.cosy.bio"):
-            command = ["git", "clone",
-                       f"https://{username}:{token}@{git_repo_url[8:]}", self.config.repo_path]
-        else:
-            command = ["git", "clone", git_repo_url, self.config.repo_path]
+        command = ["git", "clone", git_repo_url, self.config.repo_path]
         return_code, _, stderr = self._run_command(command)
 
         if return_code != 0:
             raise Exception(f"Git clone failed. Error: {stderr}")
 
         logger.info("Repository cloned successfully.")
-

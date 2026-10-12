@@ -10,6 +10,7 @@ class AppConfig(BaseSettings):
     pipeline_id: str = Field(default="")
     pipeline_secret: str = Field(default="")
     oauth_token: str = Field(default="")
+    pipeline_api_key: str = Field(default="")
 
     use_buildx: bool = Field(default=True)
     buildx_platforms: List[str] = Field(
@@ -21,9 +22,9 @@ class AppConfig(BaseSettings):
     docker_login: bool = Field(default=False)
 
     http_url: str = Field(default="http://localhost:8080")
-    docker_registry: str = Field(default="gitlab.cosy.bio:5050")
+    docker_registry: str = Field(default="ghcr.io")
 
-    docker_group: str = Field(default="/cosybio/federated-learning/federated_db/app-build-pipeline")
+    docker_group: str = Field(default="/fedlearnnet/tool-build-pipeline/pipeline")
     docker_username: str = Field(default="USERNAME")
     docker_password: str = Field(default="")
 

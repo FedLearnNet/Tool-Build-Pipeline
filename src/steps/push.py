@@ -77,7 +77,7 @@ class PushImageStep(BaseStep):
 
     def prepare_buildx(self) -> str:
         """
-        Mirrors our standart gitlab ci/cd stuff:
+        Prepares a Docker buildx builder for multi-platform builds.
           - docker context create <unique-context>
           - docker buildx create --name <unique-builder> --use <unique-context>
           - docker buildx inspect --bootstrap

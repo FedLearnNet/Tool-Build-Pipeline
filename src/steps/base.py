@@ -3,6 +3,7 @@ import subprocess
 import sys
 import traceback
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Mapping
 
@@ -13,6 +14,9 @@ from src.config import AppConfig
 
 # Each step file will have its own logger
 logger = logging.getLogger(__name__)
+
+# Output of a running command is sent to the server in batches, not line by line
+LOG_FLUSH_INTERVAL_SECONDS = 2
 
 
 class BaseStep(ABC):
@@ -28,6 +32,7 @@ class BaseStep(ABC):
         self.result: AppPublishInfoDTO = result
         self._log_buffer = []
         self._log_lock = threading.Lock()
+        self._last_flush = time.monotonic()
 
     @property
     @abstractmethod
@@ -95,7 +100,8 @@ class BaseStep(ABC):
     ):
         """Helper to send a status update to the server."""
         with self._log_lock:
-            log_payload = logs if logs is not None else "".join(self._log_buffer)
+            # buffered command output is never dropped, it is sent ahead of the given text
+            log_payload = "".join(self._log_buffer) + (logs or "")
 
             dto = StatusUpdateDTO(
                 stepName=self.step_name,
@@ -107,6 +113,7 @@ class BaseStep(ABC):
             )
             self.api_client.send_status_update(dto)
             self._log_buffer = []
+            self._last_flush = time.monotonic()
 
     def _append_log(self, line: str):
         with self._log_lock:
@@ -116,10 +123,14 @@ class BaseStep(ABC):
         with self._log_lock:
             if not self._log_buffer:
                 return
-            logs = "".join(self._log_buffer)
-            self._log_buffer = []
 
-        self._send_update("RUNNING", logs=logs, progress=progress)
+        self._send_update("RUNNING", progress=progress)
+
+    def _flush_logs_if_due(self):
+        with self._log_lock:
+            if time.monotonic() - self._last_flush < LOG_FLUSH_INTERVAL_SECONDS:
+                return
+        self._flush_logs()
 
     @staticmethod
     def _try_extract_progress(line: str) -> int | None:
@@ -148,7 +159,8 @@ class BaseStep(ABC):
         is_stderr: bool = False
     ):
         """
-        Reads one stream line-by-line and forwards output immediately.
+        Reads one stream line-by-line and forwards output in batches.
+        Whatever is still buffered when the command ends is sent by _run_command.
         """
         try:
             for line in iter(pipe.readline, ""):
@@ -165,14 +177,11 @@ class BaseStep(ABC):
                 output_list.append(line)
                 self._append_log(line)
 
-                if not is_stderr:
-                    progress = self._try_extract_progress(line)
-                    if progress is not None:
-                        self._flush_logs(progress=progress)
-                    else:
-                        self._flush_logs()
+                progress = None if is_stderr else self._try_extract_progress(line)
+                if progress is not None:
+                    self._flush_logs(progress=progress)
                 else:
-                    self._flush_logs()
+                    self._flush_logs_if_due()
         finally:
             pipe.close()
 
