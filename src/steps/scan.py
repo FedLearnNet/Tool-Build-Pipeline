@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import tempfile
 from typing import Dict, Any
 
 from src.client.result_dto import VulnerabilitySummaryDTO, SecurityScanResultDTO
@@ -44,7 +46,6 @@ class ScanImageStep(BaseStep):
                 if hasattr(summary, sev):
                     setattr(summary, sev, getattr(summary, sev) + 1)
 
-        logger.info("Trivy scan reasons: %s", reasons)
         result = SecurityScanResultDTO(
             tool="trivy",
             target=image_name,
@@ -57,33 +58,48 @@ class ScanImageStep(BaseStep):
 
     def execute(self):
         image_name = self.config.get_docker_name()
-
         logger.info(f"Scanning image: {image_name} for HIGH and CRITICAL vulnerabilities.")
 
-        command = [
-            "trivy", "image",
-            "--format", "json",
-            "--severity", "HIGH,CRITICAL",
-            "--exit-code", "1",
-            image_name
-        ]
+        # The report is written to a file outside of the repository, so it is neither streamed
+        # line by line as step log nor picked up by the malware scan of the repository
+        fd, report_path = tempfile.mkstemp(prefix="trivy-report-", suffix=".json")
+        os.close(fd)
+        try:
+            command = [
+                "trivy", "image",
+                "--format", "json",
+                "--output", report_path,
+                "--severity", "HIGH,CRITICAL",
+                "--exit-code", "1",
+                image_name
+            ]
 
-        self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
+            self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
 
-        return_code, stdout, stderr = self._run_command(command, cwd=self.config.repo_path)
+            return_code, _, stderr = self._run_command(command, cwd=self.config.repo_path)
 
-        self._send_update("RUNNING", logs="Scan command finished, processing results...",
-                          progress=90)
+            self._send_update("RUNNING", logs="Scan command finished, processing results...",
+                              progress=90)
+
+            try:
+                with open(report_path, encoding="utf-8") as report_file:
+                    report = report_file.read()
+                # sets the result that is uploaded with the publish summary, also for a clean scan
+                scan_result = self.parse_trivy_result(report, image_name, return_code)
+            except (OSError, json.JSONDecodeError):
+                raise Exception(f"Trivy scan failed. Error: {stderr}")
+        finally:
+            if os.path.exists(report_path):
+                os.remove(report_path)
+
+        summary = scan_result.summary
+        self._send_update(
+            "RUNNING",
+            logs=f"Trivy: {summary.critical} critical, {summary.high} high",
+            progress=95
+        )
 
         if return_code != 0:
-            try:
-                scan_result = self.parse_trivy_result(stdout, image_name, return_code)
-                num_vulns = scan_result.summary.get_num() if scan_result and scan_result.summary else 0
-
-                error_msg = f"Trivy found {num_vulns} HIGH/CRITICAL vulnerabilities. See logs for details."
-
-                raise Exception(error_msg)
-            except json.JSONDecodeError:
-                raise Exception(f"Trivy scan failed. Error: {stderr}")
-        else:
-            logger.info("Trivy scan completed. No HIGH or CRITICAL vulnerabilities found.")
+            raise Exception(
+                f"Trivy found {summary.get_num()} HIGH/CRITICAL vulnerabilities. See logs for details.")
+        logger.info("Trivy scan completed. No HIGH or CRITICAL vulnerabilities found.")

@@ -71,7 +71,7 @@ class ApiClient:
         try:
             response = self._request('PUT', url, json=payload, params=params, timeout=30)
             response.raise_for_status()
-            logger.info(
+            logger.debug(
                 f"Successfully sent status update for step: {update_dto.step_name} -> {update_dto.status}")
         except Exception as e:
             logger.error(f"Error sending status update: {e}")
