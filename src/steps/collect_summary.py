@@ -37,10 +37,6 @@ class CollectSummaryStep(BaseStep):
         else:
             return abs_path
 
-        if "gitlab" in base:
-            rel_q = quote(rel)
-            return f"{base}/-/blob/{commit}/{rel_q}"
-
         rel_q = quote(rel)
         return f"{base}/blob/{commit}/{rel_q}"
 

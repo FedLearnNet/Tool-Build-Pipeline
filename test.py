@@ -2,7 +2,7 @@ from src.config import load_config
 from tests.mock.helper import get_api_recorder
 from tests.mock.pipeline_test import TestPipeline
 
-origin_url = "https://gitlab.cosy.bio/cosybio/federated-learning/federated_db/apps/train-test-split.git"
+origin_url = "https://github.com/FedLearnNet/Tool-Train-test-split"
 
 if __name__ == "__main__":
 

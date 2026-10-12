@@ -74,7 +74,7 @@ def _group_updates_by_step(updates: List[StatusUpdateDTO]) -> Dict[str, List[str
 
 
 def get_api_recorder(
-        origin_url="https://gitlab.cosy.bio/cosybio/federated-learning/federated_db/apps/train-test-split.git"):
+        origin_url="https://github.com/FedLearnNet/Tool-Train-test-split"):
     injected_test_py = (
         "def test_injected_pytest_runs():\n"
         "    assert 1 + 1 == 2\n"
