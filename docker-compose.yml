@@ -8,7 +8,7 @@ services:
       environment:
         PIPELINE_ID: "${PIPELINE_ID}"
         PIPELINE_SECRET: "${PIPELINE_SECRET}"
-        OAUTH_TOKEN: "${OAUTH_TOKEN}"
+        PIPELINE_API_KEY: "${PIPELINE_API_KEY}"
         DOCKER_USERNAME: "${DOCKER_USERNAME:-}"
         DOCKER_PASSWORD: "${DOCKER_PASSWORD:-}"
         REPO_TOKEN: "${REPO_TOKEN:-}"

@@ -10,6 +10,7 @@ class AppConfig(BaseSettings):
     pipeline_id: str = Field(default="")
     pipeline_secret: str = Field(default="")
     oauth_token: str = Field(default="")
+    pipeline_api_key: str = Field(default="")
 
     use_buildx: bool = Field(default=True)
     buildx_platforms: List[str] = Field(

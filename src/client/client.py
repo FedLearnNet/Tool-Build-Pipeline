@@ -24,7 +24,9 @@ class ApiClient:
     def _headers(self) -> dict:
         """Build per-request headers (no persistent session)."""
         headers = {}
-        if self.config.oauth_token:
+        if self.config.pipeline_api_key:
+            headers['X-API-Key'] = self.config.pipeline_api_key
+        elif self.config.oauth_token:
             headers['Authorization'] = f'Bearer {self.config.oauth_token}'
         return headers
 
