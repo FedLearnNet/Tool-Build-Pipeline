@@ -60,8 +60,7 @@ class ScanImageStep(BaseStep):
         image_name = self.config.get_docker_name()
         logger.info(f"Scanning image: {image_name} for HIGH and CRITICAL vulnerabilities.")
 
-        # The report is written to a file outside of the repository, so it is neither streamed
-        # line by line as step log nor picked up by the malware scan of the repository
+        # write report to file
         fd, report_path = tempfile.mkstemp(prefix="trivy-report-", suffix=".json")
         os.close(fd)
         try:
