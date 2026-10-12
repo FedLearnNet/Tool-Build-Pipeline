@@ -109,8 +109,8 @@ class ApiClient:
             logger.error("Request error on GET %s: %s", url, e)
             raise RuntimeError(f"Failed to GET {url} due to request error: {e}") from e
 
-        if resp.status_code == 404:
-            logger.info("Pipeline ZIP not found (404) for pipeline_id=%s", self.config.pipeline_id)
+        if resp.status_code in (204, 404):
+            logger.info("No pipeline ZIP (%s) for pipeline_id=%s", resp.status_code, self.config.pipeline_id)
             return None
 
         content_type = (resp.headers.get("Content-Type") or "").lower()
