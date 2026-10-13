@@ -12,6 +12,8 @@ services:
         DOCKER_USERNAME: "${DOCKER_USERNAME:-}"
         DOCKER_PASSWORD: "${DOCKER_PASSWORD:-}"
         REPO_TOKEN: "${REPO_TOKEN:-}"
+        COSIGN_SIGN: "${COSIGN_SIGN:-false}"
+        COSIGN_KEY: "${COSIGN_KEY:-}"
 
         HTTP_URL: "http://host.docker.internal:8080"
         DOCKER_LOGIN: True

@@ -19,6 +19,7 @@ class AppConfig(BaseSettings):
     buildx_sbom: bool = Field(default=True)
     buildx_provenance_mode: Optional[str] = Field(default="max")
     cosign_sign: bool = Field(default=False)
+    cosign_key: Optional[str] = Field(default=None)
     docker_login: bool = Field(default=False)
 
     http_url: str = Field(default="http://localhost:8080")

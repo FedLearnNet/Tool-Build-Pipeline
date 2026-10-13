@@ -26,6 +26,17 @@ docker compose up --build
 All settings come from environment variables (or a `.env` file), loaded in [`src/config.py`](src/config.py).
 
 
+## Signed releases
+
+Set `COSIGN_SIGN=true` and `COSIGN_KEY` to the signing key path or KMS/Vault URI.
+When started by orch-api, these come from `PIPELINE_COSIGN_SIGN` and `PIPELINE_COSIGN_KEY`.
+The deployment must supply the key's credentials or workload identity.
+
+The existing push step signs the manifest digest returned by that push, using Buildx metadata
+for multi-platform images. 
+
+See [Cosign signing](https://docs.sigstore.dev/cosign/signing/signing_with_containers/).
+
 ## Testing
 
 ```bash
