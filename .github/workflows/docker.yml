@@ -2,7 +2,7 @@ name: Docker image
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - "Dockerfile"
       - "main.py"
@@ -24,7 +24,7 @@ env:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     strategy:
       matrix:
         include:
@@ -89,12 +89,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve tags
+        id: vars
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "tags=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=staging" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create multi-arch tags
         working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS: ${{ steps.vars.outputs.tags }}
         run: |
+          tag_args=(-t "$IMAGE:${TAGS%% *}-${GITHUB_SHA::7}")
+          for tag in $TAGS; do tag_args+=(-t "$IMAGE:$tag"); done
           docker buildx imagetools create \
-            -t "$IMAGE:latest" \
-            -t "$IMAGE:latest-${GITHUB_SHA::7}" \
+            "${tag_args[@]}" \
             $(printf "$IMAGE@sha256:%s " *)
 
   # Vulnerability scan after every build (results under Security → Code scanning)
@@ -102,7 +114,7 @@ jobs:
     needs: manifest
     uses: ./.github/workflows/scan.yml
     with:
-      tag: latest
+      tag: ${{ github.ref == 'refs/heads/main' && 'latest' || 'staging' }}
     permissions:
       contents: read
       packages: read
