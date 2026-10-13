@@ -3,6 +3,8 @@ from src.client.result_dto import AppPublishInfoDTO
 from src.config import AppConfig
 from src.steps.push import PushImageStep
 
+COMMIT_HASH = "a" * 40
+
 
 class DummyApiClient:
     def __init__(self):
@@ -56,15 +58,15 @@ def make_config(**overrides) -> AppConfig:
         remote_info=PipelineRunInfoDTO(
             imageName="demo-app",
             gitRepoUrl="https://example.com/repo.git",
-            dockerTag="1.2.3",
         ),
         **overrides,
     )
+    config.set_docker_tag(COMMIT_HASH)
     return config
 
 
 def test_push_step_buildx_adds_sbom_and_provenance_flags():
-    step = RecordingPushImageStep(make_config(), DummyApiClient(), AppPublishInfoDTO())
+    step = RecordingPushImageStep(make_config(), DummyApiClient(), AppPublishInfoDTO(commitHash=COMMIT_HASH))
 
     step.execute()
 
@@ -82,11 +84,11 @@ def test_push_step_can_sign_pushed_image_with_cosign():
     step = RecordingPushImageStep(
         make_config(use_buildx=False, cosign_sign=True),
         DummyApiClient(),
-        AppPublishInfoDTO(),
+        AppPublishInfoDTO(commitHash=COMMIT_HASH),
     )
 
     step.execute()
 
-    assert ["docker", "push", "registry.example.com/team/apps/demo-app:1.2.3"] in step.commands
+    assert ["docker", "push", f"registry.example.com/team/apps/demo-app:{COMMIT_HASH}"] in step.commands
     assert ["cosign", "version"] in step.commands
-    assert ["cosign", "sign", "--yes", "registry.example.com/team/apps/demo-app:1.2.3"] in step.commands
+    assert ["cosign", "sign", "--yes", f"registry.example.com/team/apps/demo-app:{COMMIT_HASH}"] in step.commands

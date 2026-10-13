@@ -75,8 +75,7 @@ def _group_updates_by_step(updates: List[StatusUpdateDTO]) -> Dict[str, List[str
 def get_api_recorder(
         origin_url="https://github.com/FedLearnNet/Tool-Train-test-split"):
     test_image_name = uuid.uuid4().hex + "-test-image"
-    info_payload = PipelineRunInfoDTO(imageName=test_image_name, gitRepoUrl=origin_url,
-                                      dockerTag="test")
+    info_payload = PipelineRunInfoDTO(imageName=test_image_name, gitRepoUrl=origin_url)
 
     return ApiRecorder(info=info_payload)
 

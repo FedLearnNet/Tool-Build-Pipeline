@@ -1,9 +1,9 @@
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import requests
 
-from src.client.dto import StatusUpdateDTO, PipelineRunInfoDTO, FileDTO
+from src.client.dto import StatusUpdateDTO, PipelineRunInfoDTO
 from src.client.result_dto import AppPublishInfoDTO
 from src.config import AppConfig
 
@@ -110,7 +110,8 @@ class ApiClient:
             raise RuntimeError(f"Failed to GET {url} due to request error: {e}") from e
 
         if resp.status_code in (204, 404):
-            logger.info("No pipeline ZIP (%s) for pipeline_id=%s", resp.status_code, self.config.pipeline_id)
+            logger.info("No pipeline ZIP (%s) for pipeline_id=%s", resp.status_code,
+                        self.config.pipeline_id)
             return None
 
         content_type = (resp.headers.get("Content-Type") or "").lower()
@@ -120,7 +121,6 @@ class ApiClient:
         return resp.content
 
     def upload_summary(self, result: AppPublishInfoDTO):
-        """Uploads the final app publish info to the server."""
         url = f"{self.get_base_url()}/pipeline/{self.config.pipeline_id}/summary"
         params = {'secret': self.config.pipeline_secret}
         payload = result.model_dump(by_alias=True, exclude_none=True)

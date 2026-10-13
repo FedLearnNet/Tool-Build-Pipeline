@@ -13,13 +13,6 @@ class CollectSummaryStep(BaseStep):
     def step_name(self) -> str:
         return "COLLECT_SUMMARY"
 
-    def _get_commit_hash(self) -> str:
-        cmd = ["git", "rev-parse", "HEAD"]
-        code, out, err = self._run_command(cmd, cwd=self.config.repo_path)
-        if code != 0:
-            raise Exception(f"Failed to read commit hash: {err}")
-        return (out or "").strip()
-
     def _repo_base_url(self) -> str:
         url = (self.config.remote_info.git_repo_url or "").strip()
         if url.endswith(".git"):
@@ -44,7 +37,8 @@ class CollectSummaryStep(BaseStep):
         if not self.config.remote_info:
             raise Exception("remote_info missing; FetchConfigStep must run first.")
 
-        self.result.commit_hash = self._get_commit_hash()
+        if not self.result.commit_hash:
+            raise Exception("commit_hash missing; CloneRepoStep must run first.")
 
         base_dir = os.path.abspath(self.config.repo_path)
 

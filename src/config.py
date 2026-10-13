@@ -19,6 +19,7 @@ class AppConfig(BaseSettings):
     buildx_sbom: bool = Field(default=True)
     buildx_provenance_mode: Optional[str] = Field(default="max")
     cosign_sign: bool = Field(default=False)
+    cosign_key: Optional[str] = Field(default=None)
     docker_login: bool = Field(default=False)
 
     http_url: str = Field(default="http://localhost:8080")
@@ -27,8 +28,8 @@ class AppConfig(BaseSettings):
     docker_group: str = Field(default="/fedlearnnet/tool-build-pipeline/pipeline")
     docker_username: str = Field(default="USERNAME")
     docker_password: str = Field(default="")
+    docker_tag: str = Field(default="latest")
 
-    repo_token: str = Field(default="")
     repo_path: str = Field(default="./repo")
     remote_info: Optional[PipelineRunInfoDTO] = Field(default=None)
 
@@ -39,11 +40,16 @@ class AppConfig(BaseSettings):
         protected_namespaces=()
     )
 
+    def set_docker_tag(self, docker_tag: str) -> None:
+        if not docker_tag:
+            raise ValueError("Docker tag must not be empty.")
+        self.docker_tag = docker_tag
+
     def get_docker_name(self) -> str:
         if not self.remote_info:
             raise ValueError("Remote info is not set in the configuration.")
         image_name = self.remote_info.image_name.lower()
-        return f"{self.docker_registry}{self.docker_group}/{image_name}:{self.remote_info.docker_tag}"
+        return f"{self.docker_registry}{self.docker_group}/{image_name}:{self.docker_tag}"
 
 
 def load_config() -> AppConfig:

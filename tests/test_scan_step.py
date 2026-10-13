@@ -38,10 +38,10 @@ def make_step(return_code, report) -> RecordingScanImageStep:
         remote_info=PipelineRunInfoDTO(
             gitRepoUrl="https://example.com/demo.git",
             imageName="demo-app",
-            dockerTag="1.2.3",
         ),
     )
-    return RecordingScanImageStep(config, DummyApiClient(), AppPublishInfoDTO(), return_code, report)
+    config.set_docker_tag("a" * 40)
+    return RecordingScanImageStep(config, DummyApiClient(), AppPublishInfoDTO(commitHash="a" * 40), return_code, report)
 
 
 def report_with_high_findings(count: int) -> str:
