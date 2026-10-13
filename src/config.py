@@ -49,7 +49,10 @@ class AppConfig(BaseSettings):
         if not self.remote_info:
             raise ValueError("Remote info is not set in the configuration.")
         image_name = self.remote_info.image_name.lower()
-        return f"{self.docker_registry}{self.docker_group}/{image_name}:{self.docker_tag}"
+        registry = self.docker_registry.removeprefix("https://").removeprefix("http://").rstrip("/")
+        group = self.docker_group.strip("/")
+        repository = "/".join(part for part in [registry, group, image_name] if part)
+        return f"{repository}:{self.docker_tag}"
 
 
 def load_config() -> AppConfig:

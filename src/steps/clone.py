@@ -1,4 +1,5 @@
 import logging
+import re
 import shutil
 from src.steps.base import BaseStep
 
@@ -21,12 +22,24 @@ class CloneRepoStep(BaseStep):
         if return_code != 0:
             raise Exception(f"Git clone failed. Error: {stderr}")
 
+        requested_commit = self.config.remote_info.commit_hash
+        if requested_commit:
+            if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", requested_commit):
+                raise ValueError("A full Git commit hash is required")
+            return_code, _, stderr = self._run_command(
+                ["git", "checkout", "--detach", requested_commit], cwd=self.config.repo_path
+            )
+            if return_code != 0:
+                raise Exception(f"Failed to check out commit {requested_commit}: {stderr}")
+
         return_code, stdout, stderr = self._run_command(
             ["git", "rev-parse", "HEAD"], cwd=self.config.repo_path
         )
         commit_hash = (stdout or "").strip()
         if return_code != 0 or not commit_hash:
             raise Exception(f"Failed to read commit hash: {stderr}")
+        if requested_commit and commit_hash.lower() != requested_commit.lower():
+            raise Exception(f"Checked out commit {commit_hash} does not match {requested_commit}")
 
         self.result.commit_hash = commit_hash
         self.config.set_docker_tag(commit_hash)
