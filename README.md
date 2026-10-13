@@ -25,6 +25,9 @@ docker compose up --build
 
 All settings come from environment variables (or a `.env` file), loaded in [`src/config.py`](src/config.py).
 
+The pipeline clones `main` and stores its latest commit hash in the shared config as the Docker tag.
+The build summary records the same hash for export.
+
 
 ## Testing
 
