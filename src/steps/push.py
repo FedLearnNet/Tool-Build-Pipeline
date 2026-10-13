@@ -1,4 +1,8 @@
+import json
 import logging
+import os
+import re
+import tempfile
 import uuid
 
 from src.steps.base import BaseStep
@@ -38,7 +42,8 @@ class PushImageStep(BaseStep):
                 platforms.append(platform)
         return ",".join(platforms)
 
-    def _build_buildx_command(self, builder_name: str, image_name: str) -> list[str]:
+    def _build_buildx_command(self, builder_name: str, image_name: str,
+                              metadata_path: str | None = None) -> list[str]:
         command = [
             "docker", "buildx", "build",
             "--builder", builder_name,
@@ -47,6 +52,9 @@ class PushImageStep(BaseStep):
             "--progress", "plain",
             "-t", image_name,
         ]
+
+        if metadata_path:
+            command.extend(["--metadata-file", metadata_path])
 
         if self.config.buildx_sbom:
             command.append("--sbom=true")
@@ -62,14 +70,22 @@ class PushImageStep(BaseStep):
             return
 
         if not self._cosign_available():
-            raise Exception("Cosign signing is enabled but cosign is not available in this environment.")
+            raise Exception(
+                "Cosign signing is enabled but cosign is not available in this environment.")
 
         self._send_update(
             "RUNNING",
             logs=f"Signing pushed image with cosign: {image_name}"
         )
         logger.info("Signing pushed image with cosign: %s", image_name)
-        return_code, _, stderr = self._run_command(["cosign", "sign", "--yes", image_name])
+        return_code, _, stderr = self._run_command(
+            ["cosign",
+             "sign",
+             "--yes",
+             "--key",
+             self.config.cosign_key,
+             image_name]
+        )
         if return_code != 0:
             raise Exception(f"Cosign signing failed. Error: {stderr}")
 
@@ -188,14 +204,20 @@ class PushImageStep(BaseStep):
 
     def execute(self):
         image_name = self.config.get_docker_name()
+        if self.config.cosign_sign and not (self.config.cosign_key or "").strip():
+            raise Exception(
+                "Cosign signing requires COSIGN_KEY (a signing key path or KMS/Vault URI).")
+        metadata_path = None
 
         logger.info(f"Pushing image: {image_name} to registry.")
         use_buildx = self.config.use_buildx
         buildx_available = self._buildx_available()
 
         if use_buildx and not buildx_available:
-            logger.warning("Buildx is enabled in config but not available. Falling back to normal push.")
-            self._send_update("RUNNING", logs="Buildx enabled but not available. Falling back to normal push.")
+            logger.warning(
+                "Buildx is enabled in config but not available. Falling back to normal push.")
+            self._send_update("RUNNING",
+                              logs="Buildx enabled but not available. Falling back to normal push.")
             use_buildx = False
 
         if use_buildx:
@@ -210,7 +232,10 @@ class PushImageStep(BaseStep):
                     f"provenance mode={self.config.buildx_provenance_mode or 'disabled'}."
                 )
             )
-            command = self._build_buildx_command(builder_name, image_name)
+            if self.config.cosign_sign:
+                fd, metadata_path = tempfile.mkstemp(prefix="pipeline-push-", suffix=".json")
+                os.close(fd)
+            command = self._build_buildx_command(builder_name, image_name, metadata_path)
         else:
             self._send_update(
                 "RUNNING",
@@ -219,13 +244,35 @@ class PushImageStep(BaseStep):
             command = ["docker", "push", image_name]
 
         try:
-            return_code, _, stderr = self._run_command(command)
+            return_code, stdout, stderr = self._run_command(command)
+            if return_code != 0:
+                raise Exception(f"Docker push failed. Error: {stderr}")
+
+            if self.config.cosign_sign:
+                digest = self._pushed_digest(metadata_path, f"{stdout}\n{stderr}")
+                image_ref = f"{image_name.rsplit(':', 1)[0]}@{digest}"
+                self._sign_image(image_ref)
+                self.result.image_name = image_ref
         finally:
             if use_buildx:
                 self.remove_buildx()
+            if metadata_path and os.path.exists(metadata_path):
+                os.remove(metadata_path)
 
-        if return_code != 0:
-            raise Exception(f"Docker push failed. Error: {stderr}")
-
-        self._sign_image(image_name)
         logger.info("Image pushed successfully.")
+
+    def _pushed_digest(self, metadata_path: str | None, push_output: str) -> str:
+        if metadata_path is not None:
+            try:
+                with open(metadata_path, encoding="utf-8") as metadata_file:
+                    metadata = json.load(metadata_file)
+            except (OSError, json.JSONDecodeError) as e:
+                raise Exception("Cannot read the published Buildx manifest digest.") from e
+            digest = metadata.get("containerimage.digest") if isinstance(metadata, dict) else None
+        else:
+            match = re.search(r"\bdigest:\s+(sha256:[0-9a-f]{64})\b", push_output)
+            digest = match.group(1) if match else None
+
+        if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise Exception("Docker push did not return a valid registry manifest digest.")
+        return digest
