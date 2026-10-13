@@ -68,7 +68,7 @@ class CollectSummaryStep(BaseStep):
                 file_links.append(self._file_to_raw_git_link(self.result.commit_hash, abs_fp))
 
         self.result.file_paths = file_links
-        self.result.image_name = self.config.get_docker_name()
+        self.result.image_name = self.result.image_name or self.config.get_docker_name()
         summary_msg = "Publish summary built: " \
                       f"commit={self.result.commit_hash}, " \
                       f"files={len(self.result.file_paths)}, " \
