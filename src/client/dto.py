@@ -24,6 +24,7 @@ class PipelineRunInfoDTO(BaseModel):
     """ DTO for receiving build info from the server. """
     git_repo_url: Optional[str] = Field(alias='gitRepoUrl', default=None)
     image_name: str = Field(alias='imageName')
+    commit_hash: Optional[str] = Field(alias='commitHash', default=None)
 
     class Config:
         populate_by_name = True
