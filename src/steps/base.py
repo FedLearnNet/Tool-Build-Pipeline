@@ -57,7 +57,8 @@ class BaseStep(ABC):
             self._send_update("RUNNING", "Step started.", progress=0)
 
             self.execute()  # The core logic of the step is implemented here
-
+            # Only reached if the step completes successfully,
+            # otherwise a step should raise an exception
             logger.info(f"----- Finished Step: {self.step_name} -----")
             self._send_update("SUCCESS", "Step completed successfully.", progress=100)
             return True

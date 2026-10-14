@@ -75,4 +75,5 @@ class CollectSummaryStep(BaseStep):
 
         self.api_client.upload_summary(self.result)
 
-        self._send_update("SUCCESS", logs="Publish summary uploaded.", progress=100)
+        # base.py will send this log together with SUCCESS and progress=100
+        self._append_log("Publish summary uploaded.\n")
