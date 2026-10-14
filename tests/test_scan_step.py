@@ -20,8 +20,10 @@ class RecordingScanImageStep(ScanImageStep):
         self.return_code = return_code
         self.report = report
         self.report_path = None
+        self.command = None
 
     def _run_command(self, command, cwd=".", env=None):
+        self.command = command
         self.report_path = command[command.index("--output") + 1]
         if self.report is None:
             os.remove(self.report_path)
@@ -31,8 +33,9 @@ class RecordingScanImageStep(ScanImageStep):
         return self.return_code, "", "trivy stderr"
 
 
-def make_step(return_code, report) -> RecordingScanImageStep:
+def make_step(return_code, report, local_only=False) -> RecordingScanImageStep:
     config = AppConfig(
+        local_only=local_only,
         docker_registry="registry.example.com",
         docker_group="/team/apps",
         remote_info=PipelineRunInfoDTO(
@@ -54,8 +57,9 @@ def report_with_high_findings(count: int) -> str:
     })
 
 
-def test_clean_scan_still_sets_the_result():
-    step = make_step(0, json.dumps({"Results": []}))
+@pytest.mark.parametrize("local_only", [False, True])
+def test_clean_scan_still_sets_the_result(local_only):
+    step = make_step(0, json.dumps({"Results": []}), local_only)
 
     step.execute()
 
@@ -63,11 +67,15 @@ def test_clean_scan_still_sets_the_result():
     assert scan_result is not None
     assert scan_result.success is True
     assert scan_result.summary.get_num() == 0
+    assert scan_result.target == step.config.get_docker_name()
+    assert ("--skip-db-update" in step.command) == local_only
+    assert ("--offline-scan" in step.command) == local_only
     assert not os.path.exists(step.report_path)
 
 
-def test_findings_set_the_result_and_fail_the_step():
-    step = make_step(1, report_with_high_findings(2))
+@pytest.mark.parametrize("local_only", [False, True])
+def test_findings_set_the_result_and_fail_the_step(local_only):
+    step = make_step(1, report_with_high_findings(2), local_only)
 
     with pytest.raises(Exception, match="Trivy found 2 HIGH/CRITICAL vulnerabilities"):
         step.execute()
@@ -79,8 +87,9 @@ def test_findings_set_the_result_and_fail_the_step():
     assert not os.path.exists(step.report_path)
 
 
-def test_missing_report_fails_with_the_trivy_error():
-    step = make_step(2, None)
+@pytest.mark.parametrize("local_only", [False, True])
+def test_missing_report_fails_with_the_trivy_error(local_only):
+    step = make_step(2, None, local_only)
 
     with pytest.raises(Exception, match="Trivy scan failed. Error: trivy stderr"):
         step.execute()
