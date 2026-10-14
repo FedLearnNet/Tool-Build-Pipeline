@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -54,7 +54,7 @@ jobs:
       # Summary on the run page and failed tests as annotations
       - name: Publish test results
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@v6.5.0
+        uses: mikepenz/action-junit-report@v6.6.0
         with:
           report_paths: "test-results/junit.xml"
           annotate_only: true
