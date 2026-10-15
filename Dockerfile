@@ -2,7 +2,8 @@ FROM python:3.12-slim-bookworm AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Prepare keyrings and apt sources for Docker CLI and Trivy (no heavy installs here)
-RUN apt-get update && \
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     gnupg \
@@ -34,7 +35,8 @@ COPY --from=builder /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/
 COPY --from=builder /usr/share/keyrings/trivy.gpg /usr/share/keyrings/trivy.gpg
 COPY --from=builder /etc/apt/sources.list.d/trivy.list /etc/apt/sources.list.d/trivy.list
 
-RUN apt-get update && \
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
       git \
