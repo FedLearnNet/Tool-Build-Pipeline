@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 RULES_PATH = Path(__file__).resolve().parents[1] / "sast" / "python.yml"
 EXCLUDES = (
     ".git", ".venv", "venv", "node_modules", "__pycache__",
-    "*.ipynb",
     "*.csv", "*.parquet", "*.pkl", "*.pickle", "*.pt", "*.pth", "*.onnx",
 )
 
