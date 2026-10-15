@@ -75,6 +75,8 @@ class AppConfig(BaseSettings):
     def get_docker_name(self) -> str:
         if not self.remote_info:
             raise ValueError("Remote info is not set in the configuration.")
+        if self.is_scan_only and self.remote_info.image_reference:
+            return self.remote_info.image_reference
         image_name = self.remote_info.image_name.lower()
         registry = self.docker_registry.removeprefix("https://").removeprefix("http://").rstrip("/")
         group = self.docker_group.strip("/")

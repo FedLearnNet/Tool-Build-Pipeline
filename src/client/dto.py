@@ -25,6 +25,7 @@ class PipelineRunInfoDTO(BaseModel):
     git_repo_url: Optional[str] = Field(alias='gitRepoUrl', default=None)
     image_name: str = Field(alias='imageName')
     docker_tag: Optional[str] = Field(alias='dockerTag', default=None)
+    image_reference: Optional[str] = Field(alias='imageReference', default=None)
 
     class Config:
         populate_by_name = True
