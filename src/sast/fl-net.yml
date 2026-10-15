@@ -1,0 +1,159 @@
+# Platform-owned rules, bundled with the pipeline for reproducible offline scans.
+# Preserve native ERROR/WARNING/INFO finding severities in sastScanResult.
+rules:
+  - id: flnet.python.dynamic-code-execution
+    languages: [python]
+    severity: ERROR
+    message: Avoid eval/exec on tool inputs or federated messages; parse structured data instead.
+    metadata:
+      category: security
+      cwe: ["CWE-95: Eval Injection"]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: flnet.python.shell-execution
+    languages: [python]
+    severity: ERROR
+    message: Use subprocess with an argument list and shell=False when handling tool inputs.
+    metadata:
+      category: security
+      cwe: ["CWE-78: OS Command Injection"]
+    pattern-either:
+      - pattern: subprocess.$FUNC(..., shell=True, ...)
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+
+  - id: flnet.python.unsafe-yaml
+    languages: [python]
+    severity: ERROR
+    message: Load tool configuration with yaml.safe_load or yaml.SafeLoader.
+    metadata:
+      category: security
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: yaml.load(...)
+              - pattern: yaml.load_all(...)
+          - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+          - pattern-not: yaml.load_all(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load_all(..., Loader=yaml.CSafeLoader, ...)
+          - pattern-not: yaml.load($DATA, yaml.SafeLoader)
+          - pattern-not: yaml.load($DATA, yaml.CSafeLoader)
+          - pattern-not: yaml.load_all($DATA, yaml.SafeLoader)
+          - pattern-not: yaml.load_all($DATA, yaml.CSafeLoader)
+      - pattern: yaml.unsafe_load(...)
+      - pattern: yaml.unsafe_load_all(...)
+
+  - id: flnet.python.pickle-model-loading
+    languages: [python]
+    severity: WARNING
+    message: Pickle, dill, and joblib models can execute code. Accept only trusted, verified artifacts; prefer safe data formats for federated inputs.
+    metadata:
+      category: security
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+      - pattern: dill.load(...)
+      - pattern: dill.loads(...)
+      - pattern: joblib.load(...)
+
+  - id: flnet.python.unsafe-torch-model
+    languages: [python]
+    severity: WARNING
+    message: Use torch.load(weights_only=True) for untrusted model artifacts.
+    metadata:
+      category: security
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+    pattern: torch.load(..., weights_only=False, ...)
+
+  - id: flnet.python.disabled-tls-verification
+    languages: [python]
+    severity: WARNING
+    message: Verify TLS certificates for platform, model, and federated peer connections.
+    metadata:
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+    pattern-either:
+      - pattern: requests.$METHOD(..., verify=False, ...)
+      - pattern: httpx.$METHOD(..., verify=False, ...)
+      - pattern: ssl._create_unverified_context(...)
+
+  - id: flnet.python.insecure-temp-file
+    languages: [python]
+    severity: WARNING
+    message: Use tempfile.NamedTemporaryFile or mkstemp to create temporary files atomically.
+    metadata:
+      category: security
+      cwe: ["CWE-377: Insecure Temporary File"]
+    pattern: tempfile.mktemp(...)
+
+  - id: flnet.python.unsafe-tar-extraction
+    languages: [python]
+    severity: WARNING
+    message: Extract uploaded archives with filter="data" to reject path traversal and unsafe links.
+    metadata:
+      category: security
+      cwe: ["CWE-22: Path Traversal"]
+    patterns:
+      - pattern-inside: |
+          with tarfile.open(...) as $ARCHIVE:
+            ...
+      - pattern: $ARCHIVE.extractall(...)
+      - pattern-not: $ARCHIVE.extractall(..., filter="data", ...)
+      - pattern-not: $ARCHIVE.extractall(..., filter=tarfile.data_filter, ...)
+
+  - id: flnet.python.flask-debug
+    languages: [python]
+    severity: ERROR
+    message: Disable the Flask debugger in deployed FL-Net tools.
+    metadata:
+      category: security
+      cwe: ["CWE-489: Active Debug Code"]
+    pattern: $APP.run(..., debug=True, ...)
+
+  - id: flnet.python.hardcoded-credential
+    languages: [python]
+    severity: WARNING
+    message: Supply credentials through environment variables or the platform secret mechanism.
+    metadata:
+      category: security
+      cwe: ["CWE-798: Hard-coded Credentials"]
+    patterns:
+      - pattern: $KEY = "$VALUE"
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: (?i)^(password|passwd|api_key|access_token|auth_token|secret_key)$
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: ^[^\s]{12,}$
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: (?i)^(?!(example|placeholder|changeme|your[_-]|test|dummy|\$|<)).+
+
+  - id: flnet.docker.remote-add
+    languages: [dockerfile]
+    severity: WARNING
+    message: Download remote artifacts with explicit integrity verification instead of ADD from a URL.
+    metadata:
+      category: security
+      cwe: ["CWE-494: Download of Code Without Integrity Check"]
+    patterns:
+      - pattern: ADD $URL $DEST
+      - metavariable-regex:
+          metavariable: $URL
+          regex: ^https?://
+
+  - id: flnet.yaml.python-object-construction
+    languages: [generic]
+    severity: ERROR
+    message: Remove Python object constructors from tool YAML; use plain data and safe_load.
+    metadata:
+      category: security
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+    paths:
+      include: ["*.yml", "*.yaml"]
+    pattern-regex: '!!python/(object|object/apply|object/new|name|module)\s*:'

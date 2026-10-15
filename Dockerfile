@@ -22,6 +22,7 @@ FROM python:3.12-slim-bookworm
 
 ARG TARGETARCH
 ARG COSIGN_VERSION=v3.0.2
+ARG OPENGREP_VERSION=v1.30.2
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
@@ -53,6 +54,17 @@ RUN case "${TARGETARCH}" in \
       -o /usr/local/bin/cosign && \
     chmod +x /usr/local/bin/cosign
 
+# Pin OpenGrep and verify the release asset digest for each supported architecture.
+RUN case "${TARGETARCH}" in \
+      amd64) opengrep_arch="x86"; opengrep_sha="a66aa3278457f02b287b985a45b6762aebcaba5000f2689245fd1ed86d1456c7" ;; \
+      arm64) opengrep_arch="aarch64"; opengrep_sha="90acea5df4b733083f388d4feeb250ca802f671b33d1f222653d1e571dd2b0d8" ;; \
+      *) echo "Unsupported architecture for OpenGrep: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_${opengrep_arch}" \
+      -o /usr/local/bin/opengrep && \
+    echo "${opengrep_sha}  /usr/local/bin/opengrep" | sha256sum -c - && \
+    chmod +x /usr/local/bin/opengrep
+
 # Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -61,5 +73,8 @@ RUN freshclam && trivy image --download-db-only
 # App code
 COPY main.py .
 COPY src/ ./src/
+# Smoke-test the bundled rules without fetching registry lints.
+RUN opengrep scan --strict --config /app/src/sast/fl-net.yml --disable-version-check \
+      --json /app/src/steps/sast.py > /dev/null
 
 ENTRYPOINT ["python", "main.py"]

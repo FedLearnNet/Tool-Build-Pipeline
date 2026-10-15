@@ -30,7 +30,7 @@ class CollectSummaryStep(BaseStep):
         else:
             return abs_path
 
-        if self.config.local_only:
+        if self.config.is_local_build:
             return rel
 
         rel_q = quote(rel)
@@ -40,7 +40,13 @@ class CollectSummaryStep(BaseStep):
         if not self.config.remote_info:
             raise Exception("remote_info missing; FetchConfigStep must run first.")
 
-        if self.config.local_only:
+        if self.config.is_scan_only:
+            self.result.image_name = self.config.get_docker_name()
+            self.api_client.upload_summary(self.result)
+            self._append_log("Vulnerability rescan summary uploaded.\n")
+            return
+
+        if self.config.is_local_build:
             self.result.commit_hash = "local"
         elif not self.result.commit_hash:
             raise Exception("commit_hash missing; CloneRepoStep must run first.")
@@ -72,6 +78,7 @@ class CollectSummaryStep(BaseStep):
                       f"commit={self.result.commit_hash}, " \
                       f"files={len(self.result.file_paths)}, " \
                       f"vuln='{self.result.vulnerability_scan_result}', " \
+                      f"sast='{self.result.sast_scan_result}', " \
                       f"malware='{self.result.malware_scan_result}', " \
                       f"imageName='{self.result.image_name}', "
         logger.info(summary_msg)

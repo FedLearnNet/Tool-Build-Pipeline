@@ -26,6 +26,8 @@ class ScanImageStep(BaseStep):
             exit_code: int
     ) -> SecurityScanResultDTO:
         report = json.loads(stdout)
+        if not isinstance(report, dict) or not ("Results" in report or "SchemaVersion" in report):
+            raise ValueError("Invalid Trivy report: missing Results or SchemaVersion")
 
         summary = VulnerabilitySummaryDTO()
         reasons: Dict[str, Any] = {}
@@ -69,16 +71,18 @@ class ScanImageStep(BaseStep):
                 "--format", "json",
                 "--output", report_path,
                 "--severity", "HIGH,CRITICAL",
+                "--scanners", "vuln",
+                "--image-src", "docker",
                 "--exit-code", "1",
             ]
-            if self.config.local_only:
+            if self.config.is_local_build:
                 # Local builds use the database baked into the pipeline image.
                 command.extend(["--skip-db-update", "--offline-scan"])
             command.append(image_name)
 
             self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
 
-            return_code, _, stderr = self._run_command(command, cwd=self.config.repo_path)
+            return_code, _, stderr = self._run_command(command)
 
             self._send_update("RUNNING", logs="Scan command finished, processing results...",
                               progress=90)
@@ -88,7 +92,7 @@ class ScanImageStep(BaseStep):
                     report = report_file.read()
                 # sets the result that is uploaded with the publish summary, also for a clean scan
                 scan_result = self.parse_trivy_result(report, image_name, return_code)
-            except (OSError, json.JSONDecodeError):
+            except (OSError, ValueError):
                 raise Exception(f"Trivy scan failed. Error: {stderr}")
         finally:
             if os.path.exists(report_path):
@@ -101,6 +105,8 @@ class ScanImageStep(BaseStep):
             progress=95
         )
 
+        if return_code not in (0, 1) or (return_code == 1 and not summary.get_num()):
+            raise Exception(f"Trivy scan failed with exit code {return_code}. Error: {stderr}")
         if return_code != 0:
             raise Exception(
                 f"Trivy found {summary.get_num()} HIGH/CRITICAL vulnerabilities. See logs for details.")

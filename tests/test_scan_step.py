@@ -4,7 +4,7 @@ import os
 import pytest
 
 from src.client.result_dto import AppPublishInfoDTO
-from src.config import AppConfig
+from src.config import AppConfig, RunMode
 from src.client.dto import PipelineRunInfoDTO
 from src.steps.scan import ScanImageStep
 
@@ -33,9 +33,9 @@ class RecordingScanImageStep(ScanImageStep):
         return self.return_code, "", "trivy stderr"
 
 
-def make_step(return_code, report, local_only=False) -> RecordingScanImageStep:
+def make_step(return_code, report, local_build=False) -> RecordingScanImageStep:
     config = AppConfig(
-        local_only=local_only,
+        run_mode=RunMode.LOCAL_BUILD if local_build else RunMode.ALL,
         docker_registry="registry.example.com",
         docker_group="/team/apps",
         remote_info=PipelineRunInfoDTO(
@@ -57,9 +57,9 @@ def report_with_high_findings(count: int) -> str:
     })
 
 
-@pytest.mark.parametrize("local_only", [False, True])
-def test_clean_scan_still_sets_the_result(local_only):
-    step = make_step(0, json.dumps({"Results": []}), local_only)
+@pytest.mark.parametrize("local_build", [False, True])
+def test_clean_scan_still_sets_the_result(local_build):
+    step = make_step(0, json.dumps({"Results": []}), local_build)
 
     step.execute()
 
@@ -68,14 +68,16 @@ def test_clean_scan_still_sets_the_result(local_only):
     assert scan_result.success is True
     assert scan_result.summary.get_num() == 0
     assert scan_result.target == step.config.get_docker_name()
-    assert ("--skip-db-update" in step.command) == local_only
-    assert ("--offline-scan" in step.command) == local_only
+    assert ("--skip-db-update" in step.command) == local_build
+    assert ("--offline-scan" in step.command) == local_build
+    assert step.command[step.command.index("--scanners") + 1] == "vuln"
+    assert step.command[step.command.index("--image-src") + 1] == "docker"
     assert not os.path.exists(step.report_path)
 
 
-@pytest.mark.parametrize("local_only", [False, True])
-def test_findings_set_the_result_and_fail_the_step(local_only):
-    step = make_step(1, report_with_high_findings(2), local_only)
+@pytest.mark.parametrize("local_build", [False, True])
+def test_findings_set_the_result_and_fail_the_step(local_build):
+    step = make_step(1, report_with_high_findings(2), local_build)
 
     with pytest.raises(Exception, match="Trivy found 2 HIGH/CRITICAL vulnerabilities"):
         step.execute()
@@ -87,11 +89,28 @@ def test_findings_set_the_result_and_fail_the_step(local_only):
     assert not os.path.exists(step.report_path)
 
 
-@pytest.mark.parametrize("local_only", [False, True])
-def test_missing_report_fails_with_the_trivy_error(local_only):
-    step = make_step(2, None, local_only)
+@pytest.mark.parametrize("local_build", [False, True])
+def test_missing_report_fails_with_the_trivy_error(local_build):
+    step = make_step(2, None, local_build)
 
     with pytest.raises(Exception, match="Trivy scan failed. Error: trivy stderr"):
         step.execute()
 
     assert step.result.vulnerability_scan_result is None
+
+
+@pytest.mark.parametrize("report", ["invalid json", "{}", "[]"])
+def test_invalid_report_is_not_a_clean_scan(report):
+    step = make_step(0, report)
+    with pytest.raises(Exception, match="Trivy scan failed"):
+        step.execute()
+    assert step.result.vulnerability_scan_result is None
+    assert not os.path.exists(step.report_path)
+
+
+@pytest.mark.parametrize("return_code", [1, 2])
+def test_operational_failure_does_not_claim_to_have_found_vulnerabilities(return_code):
+    step = make_step(return_code, json.dumps({"Results": []}))
+    with pytest.raises(Exception, match="Trivy scan failed with exit code"):
+        step.execute()
+    assert not step.result.vulnerability_scan_result.success

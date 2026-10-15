@@ -4,20 +4,20 @@ from unittest.mock import MagicMock
 
 from src.client.dto import PipelineRunInfoDTO
 from src.client.result_dto import AppPublishInfoDTO
-from src.config import AppConfig
+from src.config import AppConfig, RunMode
 from src.pipeline import Pipeline
 from src.steps.fetch_files import FetchFilesStep
 from src.steps.collect_summary import CollectSummaryStep
 
 
 def _config(tmp_path, **kwargs) -> AppConfig:
-    return AppConfig(local_only=True, repo_path=str(tmp_path / "repo"),
+    return AppConfig(run_mode=RunMode.LOCAL_BUILD, repo_path=str(tmp_path / "repo"),
                      remote_info=PipelineRunInfoDTO(image_name="fl-net/code/Double-1", docker_tag="abc123"), **kwargs)
 
 
 def test_local_pipeline_skips_clone_and_push(tmp_path) -> None:
     steps = [step.step_name for step in Pipeline(_config(tmp_path), MagicMock()).steps]
-    assert steps == ["FETCH_CONFIG", "FETCH_FILES", "BUILD_IMAGE", "SCAN_IMAGE", "MALWARE_CHECK",
+    assert steps == ["FETCH_CONFIG", "FETCH_FILES", "SAST", "BUILD_IMAGE", "SCAN_IMAGE", "MALWARE_CHECK",
                      "RUN_PYTEST", "COLLECT_SUMMARY"]
 
 
