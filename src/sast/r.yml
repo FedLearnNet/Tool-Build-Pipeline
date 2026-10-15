@@ -1,0 +1,48 @@
+rules:
+  - id: flnet.r.dynamic-code-execution
+    languages: [r]
+    severity: WARNING
+    message: Avoid evaluating parsed tool inputs or federated messages; use structured data instead.
+    metadata:
+      category: security
+      cwe: ["CWE-95: Eval Injection"]
+    pattern-either:
+      - pattern: eval(parse(...), ...)
+      - pattern: base::eval(parse(...), ...)
+      - pattern: eval(base::parse(...), ...)
+      - pattern: base::eval(base::parse(...), ...)
+
+  - id: flnet.r.shell-execution
+    languages: [r]
+    severity: WARNING
+    message: Review system commands for untrusted tool inputs; avoid shell interpolation and validate arguments.
+    metadata:
+      category: security
+      cwe: ["CWE-78: OS Command Injection"]
+    pattern-either:
+      - pattern: system(...)
+      - pattern: system2(...)
+      - pattern: shell(...)
+      - pattern: base::system(...)
+      - pattern: base::system2(...)
+      - pattern: base::shell(...)
+
+  - id: flnet.r.remote-source
+    languages: [r]
+    severity: WARNING
+    message: Bundle reviewed R scripts with the tool instead of executing source code from a remote URL.
+    metadata:
+      category: security
+      cwe: ["CWE-829: Inclusion of Functionality from Untrusted Control Sphere"]
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: source($URL, ...)
+              - pattern: base::source($URL, ...)
+          - metavariable-regex:
+              metavariable: $URL
+              regex: ^["'](https?|ftp)://
+      - pattern: source(url(...), ...)
+      - pattern: source(base::url(...), ...)
+      - pattern: base::source(url(...), ...)
+      - pattern: base::source(base::url(...), ...)

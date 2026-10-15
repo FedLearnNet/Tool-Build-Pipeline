@@ -72,9 +72,9 @@ RUN curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.
 # App code
 COPY main.py .
 COPY src/ ./src/
-# Bundle the standard Python rules for offline scans and validate them during the build.
+# Bundle standard Python rules alongside the R policy for offline scans.
 ADD https://semgrep.dev/c/p/python /app/src/sast/python.yml
-RUN opengrep scan --strict --config /app/src/sast/python.yml --disable-version-check \
+RUN opengrep scan --strict --config /app/src/sast --disable-version-check \
       --json /app/src/steps/sast.py > /dev/null
 
 ENTRYPOINT ["python", "main.py"]

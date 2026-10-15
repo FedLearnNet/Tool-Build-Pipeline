@@ -24,7 +24,7 @@ def make_step(tmp_path, report, return_code=0):
     return step
 
 
-def test_clean_sast_reports_success_with_python_rules_and_no_suppressions(tmp_path):
+def test_clean_sast_reports_success_with_bundled_rules_and_no_suppressions(tmp_path):
     step = make_step(tmp_path, {"version": "1.30.2", "results": [], "errors": [],
                                 "paths": {"scanned": ["main.py"]}})
     step.execute()
