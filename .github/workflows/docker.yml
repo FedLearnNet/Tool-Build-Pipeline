@@ -8,6 +8,7 @@ on:
       - "main.py"
       - "src/**"
       - "requirements.txt"
+      - "VERSION"
       - ".github/workflows/docker.yml"
   workflow_dispatch:
 
@@ -23,7 +24,22 @@ env:
   IMAGE: ghcr.io/fedlearnnet/tool-build-pipeline/pipeline
 
 jobs:
+  # Version from the VERSION file and whether it gets an image tag and a release, see FedLearnNet/.github/actions/version
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_image: ${{ steps.version.outputs.tag_image }}
+      release: ${{ steps.version.outputs.release }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: version
+        uses: FedLearnNet/.github/actions/version@main
+
   build:
+    needs: version
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     strategy:
       matrix:
@@ -57,6 +73,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -73,7 +90,7 @@ jobs:
           retention-days: 1
 
   manifest:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -91,12 +108,13 @@ jobs:
 
       - name: Resolve tags
         id: vars
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TAG_IMAGE: ${{ needs.version.outputs.tag_image }}
         run: |
-          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            echo "tags=latest" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=staging" >> "$GITHUB_OUTPUT"
-          fi
+          tags=$([ "$GITHUB_REF" = "refs/heads/main" ] && echo latest || echo staging)
+          if [ "$TAG_IMAGE" = true ]; then tags="$tags $VERSION"; fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
 
       - name: Create multi-arch tags
         working-directory: ${{ runner.temp }}/digests
@@ -108,6 +126,24 @@ jobs:
           docker buildx imagetools create \
             "${tag_args[@]}" \
             $(printf "$IMAGE@sha256:%s " *)
+
+  # First build of a release candidate or release: git tag and GitHub release
+  release:
+    needs: [version, manifest]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$VERSION" --generate-notes --prerelease="$PRERELEASE"
 
   # Vulnerability scan after every build (results under Security → Code scanning)
   scan:
