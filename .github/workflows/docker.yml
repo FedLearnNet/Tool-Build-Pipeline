@@ -121,7 +121,7 @@ jobs:
         env:
           TAGS: ${{ steps.vars.outputs.tags }}
         run: |
-          tag_args=(-t "$IMAGE:${TAGS%% *}-${GITHUB_SHA::7}")
+          tag_args=()
           for tag in $TAGS; do tag_args+=(-t "$IMAGE:$tag"); done
           docker buildx imagetools create \
             "${tag_args[@]}" \
