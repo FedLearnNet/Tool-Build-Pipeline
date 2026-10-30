@@ -32,12 +32,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       # Same Python version as the Docker image
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -54,7 +54,7 @@ jobs:
       # Summary on the run page and failed tests as annotations
       - name: Publish test results
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@v6.5.0
+        uses: mikepenz/action-junit-report@v6.6.1
         with:
           report_paths: "test-results/junit.xml"
           annotate_only: true
