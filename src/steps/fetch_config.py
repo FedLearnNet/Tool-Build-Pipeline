@@ -24,7 +24,8 @@ class FetchConfigStep(BaseStep):
         log_message = (
             f"Successfully fetched configuration:\n"
             f"  - Git Repo URL: {run_info.git_repo_url}\n"
-            f"  - Image Name: {run_info.image_name}"
+            f"  - Image Name: {run_info.image_name}\n"
+            "  - Branch: main"
         )
         logger.info(log_message)
         # Add the final summary to the log buffer to be sent with the success status

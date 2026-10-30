@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import tempfile
 from typing import Dict, Any
 
 from src.client.result_dto import VulnerabilitySummaryDTO, SecurityScanResultDTO
@@ -24,6 +26,8 @@ class ScanImageStep(BaseStep):
             exit_code: int
     ) -> SecurityScanResultDTO:
         report = json.loads(stdout)
+        if not isinstance(report, dict) or not ("Results" in report or "SchemaVersion" in report):
+            raise ValueError("Invalid Trivy report: missing Results or SchemaVersion")
 
         summary = VulnerabilitySummaryDTO()
         reasons: Dict[str, Any] = {}
@@ -44,7 +48,6 @@ class ScanImageStep(BaseStep):
                 if hasattr(summary, sev):
                     setattr(summary, sev, getattr(summary, sev) + 1)
 
-        logger.info("Trivy scan reasons: %s", reasons)
         result = SecurityScanResultDTO(
             tool="trivy",
             target=image_name,
@@ -57,45 +60,54 @@ class ScanImageStep(BaseStep):
 
     def execute(self):
         image_name = self.config.get_docker_name()
-
         logger.info(f"Scanning image: {image_name} for HIGH and CRITICAL vulnerabilities.")
 
-        if self.config.local_only:
-            # local builds use the database baked into the pipeline image
+        # write report to file
+        fd, report_path = tempfile.mkstemp(prefix="trivy-report-", suffix=".json")
+        os.close(fd)
+        try:
             command = [
                 "trivy", "image",
                 "--format", "json",
+                "--output", report_path,
                 "--severity", "HIGH,CRITICAL",
+                "--scanners", "vuln",
+                "--image-src", "docker",
                 "--exit-code", "1",
-                "--skip-db-update",
-                "--offline-scan",
-                image_name
             ]
-        else:
-            command = [
-                "trivy", "image",
-                "--format", "json",
-                "--severity", "HIGH,CRITICAL",
-                "--exit-code", "1",
-                image_name
-            ]
+            if self.config.is_local_build:
+                # Local builds use the database baked into the pipeline image.
+                command.extend(["--skip-db-update", "--offline-scan"])
+            command.append(image_name)
 
-        self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
+            self._send_update("RUNNING", logs="Starting Trivy scan...", progress=10)
 
-        return_code, stdout, stderr = self._run_command(command, cwd=self.config.repo_path)
+            return_code, _, stderr = self._run_command(command)
 
-        self._send_update("RUNNING", logs="Scan command finished, processing results...",
-                          progress=90)
+            self._send_update("RUNNING", logs="Scan command finished, processing results...",
+                              progress=90)
 
-        if return_code != 0:
             try:
-                scan_result = self.parse_trivy_result(stdout, image_name, return_code)
-                num_vulns = scan_result.summary.get_num() if scan_result and scan_result.summary else 0
-
-                error_msg = f"Trivy found {num_vulns} HIGH/CRITICAL vulnerabilities. See logs for details."
-
-                raise Exception(error_msg)
-            except json.JSONDecodeError:
+                with open(report_path, encoding="utf-8") as report_file:
+                    report = report_file.read()
+                # sets the result that is uploaded with the publish summary, also for a clean scan
+                scan_result = self.parse_trivy_result(report, image_name, return_code)
+            except (OSError, ValueError):
                 raise Exception(f"Trivy scan failed. Error: {stderr}")
-        else:
-            logger.info("Trivy scan completed. No HIGH or CRITICAL vulnerabilities found.")
+        finally:
+            if os.path.exists(report_path):
+                os.remove(report_path)
+
+        summary = scan_result.summary
+        self._send_update(
+            "RUNNING",
+            logs=f"Trivy: {summary.critical} critical, {summary.high} high",
+            progress=95
+        )
+
+        if return_code not in (0, 1) or (return_code == 1 and not summary.get_num()):
+            raise Exception(f"Trivy scan failed with exit code {return_code}. Error: {stderr}")
+        if return_code != 0:
+            raise Exception(
+                f"Trivy found {summary.get_num()} HIGH/CRITICAL vulnerabilities. See logs for details.")
+        logger.info("Trivy scan completed. No HIGH or CRITICAL vulnerabilities found.")

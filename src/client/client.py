@@ -1,9 +1,9 @@
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import requests
 
-from src.client.dto import StatusUpdateDTO, PipelineRunInfoDTO, FileDTO
+from src.client.dto import StatusUpdateDTO, PipelineRunInfoDTO
 from src.client.result_dto import AppPublishInfoDTO
 from src.config import AppConfig
 
@@ -24,7 +24,9 @@ class ApiClient:
     def _headers(self) -> dict:
         """Build per-request headers (no persistent session)."""
         headers = {}
-        if self.config.oauth_token:
+        if self.config.pipeline_api_key:
+            headers['X-API-Key'] = self.config.pipeline_api_key
+        elif self.config.oauth_token:
             headers['Authorization'] = f'Bearer {self.config.oauth_token}'
         return headers
 
@@ -69,7 +71,7 @@ class ApiClient:
         try:
             response = self._request('PUT', url, json=payload, params=params, timeout=30)
             response.raise_for_status()
-            logger.info(
+            logger.debug(
                 f"Successfully sent status update for step: {update_dto.step_name} -> {update_dto.status}")
         except Exception as e:
             logger.error(f"Error sending status update: {e}")
@@ -107,8 +109,9 @@ class ApiClient:
             logger.error("Request error on GET %s: %s", url, e)
             raise RuntimeError(f"Failed to GET {url} due to request error: {e}") from e
 
-        if resp.status_code == 404:
-            logger.info("Pipeline ZIP not found (404) for pipeline_id=%s", self.config.pipeline_id)
+        if resp.status_code in (204, 404):
+            logger.info("No pipeline ZIP (%s) for pipeline_id=%s", resp.status_code,
+                        self.config.pipeline_id)
             return None
 
         content_type = (resp.headers.get("Content-Type") or "").lower()
@@ -118,7 +121,6 @@ class ApiClient:
         return resp.content
 
     def upload_summary(self, result: AppPublishInfoDTO):
-        """Uploads the final app publish info to the server."""
         url = f"{self.get_base_url()}/pipeline/{self.config.pipeline_id}/summary"
         params = {'secret': self.config.pipeline_secret}
         payload = result.model_dump(by_alias=True, exclude_none=True)

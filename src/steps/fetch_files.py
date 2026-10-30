@@ -35,7 +35,7 @@ class FetchFilesStep(BaseStep):
             return
 
         repo_path = Path(self.config.repo_path).expanduser().resolve()
-        if self.config.local_only:
+        if self.config.is_local_build:
             shutil.rmtree(repo_path, ignore_errors=True)
             target_dir = repo_path
         else:

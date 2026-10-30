@@ -21,7 +21,7 @@ class RunPytestStep(BaseStep):
         image_name = self.config.get_docker_name()
 
         logger.info(f"Running tests inside Docker image: {image_name}")
-        if self.config.local_only:
+        if self.config.is_local_build:
             # the local test runs without network access
             command = [
                 "docker",

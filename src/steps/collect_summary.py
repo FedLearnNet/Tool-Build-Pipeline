@@ -13,13 +13,6 @@ class CollectSummaryStep(BaseStep):
     def step_name(self) -> str:
         return "COLLECT_SUMMARY"
 
-    def _get_commit_hash(self) -> str:
-        cmd = ["git", "rev-parse", "HEAD"]
-        code, out, err = self._run_command(cmd, cwd=self.config.repo_path)
-        if code != 0:
-            raise Exception(f"Failed to read commit hash: {err}")
-        return (out or "").strip()
-
     def _repo_base_url(self) -> str:
         url = (self.config.remote_info.git_repo_url or "").strip()
         if url.endswith(".git"):
@@ -37,9 +30,8 @@ class CollectSummaryStep(BaseStep):
         else:
             return abs_path
 
-        if "gitlab" in base:
-            rel_q = quote(rel)
-            return f"{base}/-/blob/{commit}/{rel_q}"
+        if self.config.is_local_build:
+            return rel
 
         rel_q = quote(rel)
         return f"{base}/blob/{commit}/{rel_q}"
@@ -48,11 +40,16 @@ class CollectSummaryStep(BaseStep):
         if not self.config.remote_info:
             raise Exception("remote_info missing; FetchConfigStep must run first.")
 
-        if self.config.local_only:
-            # local builds have no git repository, the docker tag is the code hash
-            self.result.commit_hash = self.config.remote_info.docker_tag
-        else:
-            self.result.commit_hash = self._get_commit_hash()
+        if self.config.is_scan_only:
+            self.result.image_name = self.config.get_docker_name()
+            self.api_client.upload_summary(self.result)
+            self._append_log("Vulnerability rescan summary uploaded.\n")
+            return
+
+        if self.config.is_local_build:
+            self.result.commit_hash = "local"
+        elif not self.result.commit_hash:
+            raise Exception("commit_hash missing; CloneRepoStep must run first.")
 
         base_dir = os.path.abspath(self.config.repo_path)
 
@@ -81,6 +78,7 @@ class CollectSummaryStep(BaseStep):
                       f"commit={self.result.commit_hash}, " \
                       f"files={len(self.result.file_paths)}, " \
                       f"vuln='{self.result.vulnerability_scan_result}', " \
+                      f"sast='{self.result.sast_scan_result}', " \
                       f"malware='{self.result.malware_scan_result}', " \
                       f"imageName='{self.result.image_name}', "
         logger.info(summary_msg)
@@ -89,4 +87,5 @@ class CollectSummaryStep(BaseStep):
 
         self.api_client.upload_summary(self.result)
 
-        self._send_update("SUCCESS", logs="Publish summary uploaded.", progress=100)
+        # base.py will send this log together with SUCCESS and progress=100
+        self._append_log("Publish summary uploaded.\n")

@@ -8,10 +8,14 @@ services:
       environment:
         PIPELINE_ID: "${PIPELINE_ID}"
         PIPELINE_SECRET: "${PIPELINE_SECRET}"
-        OAUTH_TOKEN: "${OAUTH_TOKEN}"
+        PIPELINE_API_KEY: "${PIPELINE_API_KEY}"
+        RUN_MODE: "${RUN_MODE:-ALL}"
+        DOCKER_TAG: "${DOCKER_TAG:-}"
+        DOCKER_REGISTRY: "${DOCKER_REGISTRY:-ghcr.io}"
+        DOCKER_GROUP: "${DOCKER_GROUP:-/fedlearnnet/tool-build-pipeline/pipeline}"
         DOCKER_USERNAME: "${DOCKER_USERNAME:-}"
         DOCKER_PASSWORD: "${DOCKER_PASSWORD:-}"
-        REPO_TOKEN: "${REPO_TOKEN:-}"
-
-        HTTP_URL: "http://host.docker.internal:8080"
-        DOCKER_LOGIN: True
+        DOCKER_LOGIN: "${DOCKER_LOGIN:-false}"
+        SAST_TIMEOUT: "${SAST_TIMEOUT:-30}"
+        SAST_MAX_TARGET_BYTES: "${SAST_MAX_TARGET_BYTES:-1000000}"
+        HTTP_URL: "${HTTP_URL:-http://host.docker.internal:8080}"

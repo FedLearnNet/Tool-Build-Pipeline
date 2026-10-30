@@ -1,15 +1,14 @@
-import base64
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from src.client.dto import FileDTO, PipelineRunInfoDTO, StatusUpdateDTO
+from src.client.dto import PipelineRunInfoDTO, StatusUpdateDTO
 from src.client.result_dto import AppPublishInfoDTO
 
 
 class ApiRecorder:
-    def __init__(self, info: PipelineRunInfoDTO, files: List[FileDTO]):
+    def __init__(self, info: PipelineRunInfoDTO, zip_bytes: Optional[bytes] = None):
         self.info = info
-        self.files = files
+        self.zip_bytes = zip_bytes
         self.updates: List[StatusUpdateDTO] = []
 
     def send_status_update(self, payload: StatusUpdateDTO):
@@ -18,8 +17,8 @@ class ApiRecorder:
     def get_pipeline_info(self) -> PipelineRunInfoDTO:
         return self.info
 
-    def get_files_to_inject(self) -> List[FileDTO]:
-        return self.files
+    def get_zip_for_pipeline(self) -> Optional[bytes]:
+        return self.zip_bytes
 
     def upload_summary(self, result: AppPublishInfoDTO):
         print(result.model_dump_json(indent=2))
@@ -74,22 +73,11 @@ def _group_updates_by_step(updates: List[StatusUpdateDTO]) -> Dict[str, List[str
 
 
 def get_api_recorder(
-        origin_url="https://gitlab.cosy.bio/cosybio/federated-learning/federated_db/apps/train-test-split.git"):
-    injected_test_py = (
-        "def test_injected_pytest_runs():\n"
-        "    assert 1 + 1 == 2\n"
-    )
-    files_payload = [
-        FileDTO(
-            filePath="test.py",
-            content=base64.b64encode(injected_test_py.encode("utf-8")).decode("ascii"),
-        )
-    ]
+        origin_url="https://github.com/FedLearnNet/Tool-Train-test-split"):
     test_image_name = uuid.uuid4().hex + "-test-image"
-    info_payload = PipelineRunInfoDTO(imageName=test_image_name, gitRepoUrl=origin_url,
-                                      dockerTag="test")
+    info_payload = PipelineRunInfoDTO(imageName=test_image_name, gitRepoUrl=origin_url)
 
-    return ApiRecorder(info=info_payload, files=[])
+    return ApiRecorder(info=info_payload)
 
 
 def print_banner_mocked(name: str):

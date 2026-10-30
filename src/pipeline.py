@@ -10,6 +10,8 @@ from src.steps.fetch_config import FetchConfigStep
 from src.steps.fetch_files import FetchFilesStep
 from src.steps.malware import MalwareCheckStep
 from src.steps.push import PushImageStep
+from src.steps.pull import PullImageStep
+from src.steps.sast import SastStep
 from src.steps.scan import ScanImageStep
 from src.steps.test import RunPytestStep
 
@@ -21,11 +23,19 @@ class Pipeline:
         self.config: AppConfig = config
         self.client: ApiClient = client
         self.result = AppPublishInfoDTO()
-        if config.local_only:
-            #this is for local builded image via ETL pipeline, or so, no pushing or internet
+        if config.is_scan_only:
+            self.steps = [
+                FetchConfigStep(config, client, self.result),
+                PullImageStep(config, client, self.result),
+                ScanImageStep(config, client, self.result),
+                CollectSummaryStep(config, client, self.result),
+            ]
+        elif config.is_local_build:
+            # Local tools arrive as a ZIP and are never published to a registry.
             self.steps = [
                 FetchConfigStep(config, client, self.result),
                 FetchFilesStep(config, client, self.result),
+                SastStep(config, client, self.result),
                 BuildImageStep(config, client, self.result),
                 ScanImageStep(config, client, self.result),
                 MalwareCheckStep(config, client, self.result),
@@ -37,6 +47,7 @@ class Pipeline:
                 FetchConfigStep(config, client, self.result),
                 CloneRepoStep(config, client, self.result),
                 FetchFilesStep(config, client, self.result),
+                SastStep(config, client, self.result),
                 BuildImageStep(config, client, self.result),
                 ScanImageStep(config, client, self.result),
                 MalwareCheckStep(config, client, self.result),
@@ -46,7 +57,8 @@ class Pipeline:
             ]
 
     def run(self):
-        logger.info(f"--- Starting Pipeline Run: {self.config.pipeline_id} ---")
+        logger.info("--- Starting Pipeline Run: %s (mode=%s) ---",
+                    self.config.pipeline_id, self.config.run_mode.value)
         for step in self.steps:
             logger.info(f"--- Executing Step: {step.__class__.__name__} ---")
             success = False

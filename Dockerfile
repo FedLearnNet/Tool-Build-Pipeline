@@ -2,7 +2,8 @@ FROM python:3.12-slim-bookworm AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Prepare keyrings and apt sources for Docker CLI and Trivy (no heavy installs here)
-RUN apt-get update && \
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     gnupg \
@@ -33,7 +34,8 @@ COPY --from=builder /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/
 COPY --from=builder /usr/share/keyrings/trivy.gpg /usr/share/keyrings/trivy.gpg
 COPY --from=builder /etc/apt/sources.list.d/trivy.list /etc/apt/sources.list.d/trivy.list
 
-RUN apt-get update && \
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
       git \
@@ -58,8 +60,21 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # definitions are baked in, so local builds also scan without internet access
 RUN freshclam && trivy image --download-db-only
+
+# Remote release metadata refreshes the install layer when the latest release changes.
+ADD https://api.github.com/repos/opengrep/opengrep/releases/latest /tmp/opengrep-release.json
+RUN curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh -o /tmp/install-opengrep.sh && \
+    bash /tmp/install-opengrep.sh --verify-signatures \
+      -v "$(python -c 'import json; print(json.load(open("/tmp/opengrep-release.json"))["tag_name"])')" && \
+    mv /root/.opengrep/cli/latest/opengrep /usr/local/bin/opengrep && \
+    rm -rf /root/.opengrep /tmp/install-opengrep.sh /tmp/opengrep-release.json
+
 # App code
 COPY main.py .
 COPY src/ ./src/
+# Bundle standard Python rules alongside the R policy for offline scans.
+ADD https://semgrep.dev/c/p/python /app/src/sast/python.yml
+RUN opengrep scan --strict --config /app/src/sast --disable-version-check \
+      --json /app/src/steps/sast.py > /dev/null
 
 ENTRYPOINT ["python", "main.py"]
